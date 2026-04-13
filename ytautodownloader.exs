@@ -16,6 +16,8 @@ defmodule Ytautodownloader do
     init()
 
     Ytautodownloader.Ytdlp.update_playlist("https://youtube.com/playlist?list=PLKLMsHwPzDZG4pXDwB2M7LwZYq6Rvx1dh")
+    # Ytautodownloader.Ytdlp.update_playlist("https://www.youtube.com/playlist?list=PLKLMsHwPzDZF7-woh99h2AUeUn40k0ny6")
+
   end
 
   defp init() do
@@ -144,7 +146,7 @@ defmodule Ytautodownloader.Ytdlp do
       "--audio-format", "mp3",
       "-f", "ba",
       "--windows-filenames",
-      "--download-archive", Path.join(Ytautodownloader.Constants.downloads_path(), "__ARCHIVE__.txt"),
+      "--download-archive", Path.join(Ytautodownloader.Constants.downloads_path(), "!ARCHIVE!.txt"),
       "-o", Path.join(Ytautodownloader.Constants.downloads_path(), "%(id)s.%(ext)s"),
       url,
     ],
