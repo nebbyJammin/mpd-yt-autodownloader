@@ -10,13 +10,12 @@ defmodule Ytautodownloader.Constants do
   def downloads_path, do: @downloads_dir
 end
 
+# TODO: How do we handle videos that are made unavailable?
 defmodule Ytautodownloader do
 
   def main(_args \\ []) do
     init()
 
-    # Ytautodownloader.Ytdlp.playlist_name("https://youtube.com/playlist?list=PLKLMsHwPzDZG4pXDwB2M7LwZYq6Rvx1dh") |> IO.inspect()
-    # Ytautodownloader.Ytdlp.playlist_songs_ids("https://youtube.com/playlist?list=PLKLMsHwPzDZG4pXDwB2M7LwZYq6Rvx1dh") |> IO.inspect()
     Ytautodownloader.Ytdlp.update_playlist("https://youtube.com/playlist?list=PLKLMsHwPzDZG4pXDwB2M7LwZYq6Rvx1dh")
   end
 
