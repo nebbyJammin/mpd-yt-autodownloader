@@ -10,7 +10,6 @@ defmodule Ytautodownloader.Constants do
   def downloads_path, do: @downloads_dir
 end
 
-# TODO: How do we handle videos that are made unavailable?
 defmodule Ytautodownloader do
 
   def main(_args \\ []) do
@@ -132,6 +131,7 @@ defmodule Ytautodownloader.Ytdlp do
     end
   end
 
+  # TODO: This function returns an error when a video is unavailable... Should we silently fail on unavailable videos
   @spec download_playlist(String.t()) :: :ok | :error
   def download_playlist(url) do
     case System.cmd("yt-dlp", [
