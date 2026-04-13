@@ -107,6 +107,7 @@ defmodule Ytautodownloader.Ytdlp do
 
   @spec make_playlist_manifest(String.t()) :: :ok | :error
   def make_playlist_manifest(url) do
+    # TODO: Make this configurable
     playlists_directory = Path.join(__DIR__, "Playlists")
 
     with  {:ok, p_name} <- playlist_name(url),
