@@ -4,11 +4,9 @@ Mix.install([
 
 defmodule Ytautodownloader.Constants do
   @yt_autodownload_dir Path.join(__DIR__, "yt-autodownload")
-  @sqlite_db Path.join(@yt_autodownload_dir, "data.db")
   @downloads_dir Path.join(@yt_autodownload_dir, "downloads")
 
   def yt_autodownload_path, do: @yt_autodownload_dir
-  def sqlite_db, do: @sqlite_db
   def downloads_path, do: @downloads_dir
 end
 
@@ -21,14 +19,6 @@ defmodule Ytautodownloader do
 
     Ytautodownloader.Ytdlp.playlist_name("https://youtube.com/playlist?list=PLKLMsHwPzDZG4pXDwB2M7LwZYq6Rvx1dh") |> IO.inspect()
     Ytautodownloader.Ytdlp.playlist_songs_ids("https://youtube.com/playlist?list=PLKLMsHwPzDZG4pXDwB2M7LwZYq6Rvx1dh") |> IO.inspect()
-
-    conn = sqlite_connect!()
-    {:ok, statement} = Exqlite.Sqlite3.prepare(
-      conn,
-      "SELECT name FROM sqlite_schema WHERE type='table'"
-    )
-    {:ok, tables} = Exqlite.Sqlite3.fetch_all(conn, statement)
-    tables |> IO.inspect(label: "tables")
   end
 
   defp init() do
@@ -38,37 +28,6 @@ defmodule Ytautodownloader do
       {:error, _}
         -> IO.puts(:stderr, "Could not open/create directories")
     end
-  end
-
-  defp sqlite_connect!() do
-    conn = case Exqlite.Sqlite3.open(Ytautodownloader.Constants.sqlite_db) do
-      {:ok, conn} -> conn
-      {:error, _} ->
-        raise("Could not establish connection with Sqlite")
-    end
-
-    Exqlite.Sqlite3.execute(conn, 
-      """
-      CREATE TABLE IF NOT EXISTS playlists 
-      (
-        id INTEGER PRIMARY KEY, 
-        url TEXT
-      );
-      CREATE TABLE IF NOT EXISTS songs
-      (
-        id INTEGER PRIMARY KEY,
-        file_name TEXT,
-        url TEXT
-      );
-      CREATE TABLE IF NOT EXISTS playlistsongs
-      (
-        playlist_id INTEGER,
-        song_id INTEGER
-      )
-      """
-    )
-
-    conn
   end
 end
 
