@@ -1,5 +1,6 @@
 {
   "cookies_from_browser": "firefox",
+  "playlists_directory": "./Playlists/",
   "playlists": [
     "some_url"
   ]

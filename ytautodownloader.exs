@@ -12,13 +12,12 @@ end
 
 defmodule Ytautodownloader do
 
-  def main(args \\ []) do
-    args |> IO.inspect()
-
+  def main(_args \\ []) do
     init()
 
-    Ytautodownloader.Ytdlp.playlist_name("https://youtube.com/playlist?list=PLKLMsHwPzDZG4pXDwB2M7LwZYq6Rvx1dh") |> IO.inspect()
-    Ytautodownloader.Ytdlp.playlist_songs_ids("https://youtube.com/playlist?list=PLKLMsHwPzDZG4pXDwB2M7LwZYq6Rvx1dh") |> IO.inspect()
+    # Ytautodownloader.Ytdlp.playlist_name("https://youtube.com/playlist?list=PLKLMsHwPzDZG4pXDwB2M7LwZYq6Rvx1dh") |> IO.inspect()
+    # Ytautodownloader.Ytdlp.playlist_songs_ids("https://youtube.com/playlist?list=PLKLMsHwPzDZG4pXDwB2M7LwZYq6Rvx1dh") |> IO.inspect()
+    Ytautodownloader.Ytdlp.update_playlist("https://youtube.com/playlist?list=PLKLMsHwPzDZG4pXDwB2M7LwZYq6Rvx1dh")
   end
 
   defp init() do
@@ -34,6 +33,7 @@ end
 defmodule Ytautodownloader.Config do
   defstruct [
     cookies_from_browser: "firefox",
+    playlists_directory: "./Playlists/",
     playlists: [],
   ]
 
@@ -51,13 +51,27 @@ defmodule Ytautodownloader.Config do
         config_file |> IO.inspect()
       {:error, _reason} ->
         # File is missing, so create config
-        config_file = File.open(config_path, [:write])
+        _config_file = File.open(config_path, [:write])
     end
   end
 
 end
 
 defmodule Ytautodownloader.Ytdlp do
+  @doc """
+  Updates a playlist fully. Can partially fail, if for example the downloading succeeds, but the metadata cannot be fetched.
+  """
+  @spec update_playlist(String.t()) :: :ok | :error
+  def update_playlist(url) do
+    with  :ok <- download_playlist(url),
+          :ok <- make_playlist_manifest(url)
+    do
+      :ok
+    else
+      :error -> :error
+    end
+  end
+
   @spec playlist_name(String.t()) :: {:ok, String.t()} | :error
   def playlist_name(url) do
     case System.cmd("yt-dlp", [
@@ -73,7 +87,7 @@ defmodule Ytautodownloader.Ytdlp do
     end
   end
 
-  @spec playlist_songs_ids(String.t()) :: [String.t()] | :error
+  @spec playlist_songs_ids(String.t()) :: {:ok, [String.t()]} | :error
   def playlist_songs_ids(url) do
     case System.cmd("yt-dlp", [
       "--cookies-from-browser", "firefox",
@@ -83,15 +97,44 @@ defmodule Ytautodownloader.Ytdlp do
     ]) do
       {_, 1} -> :error
       {res, 0} ->
-        res
-        |> String.trim_trailing()
-        |> String.split("\n")
+        {
+          :ok,
+          res
+          |> String.trim_trailing()
+          |> String.split("\n")
+        }
     end
   end
 
-  @spec download_playlist(String.t()) :: :ok | {:error, String.t()}
+  @spec make_playlist_manifest(String.t()) :: :ok | :error
+  def make_playlist_manifest(url) do
+    playlists_directory = Path.join(__DIR__, "Playlists")
+
+    with  {:ok, p_name} <- playlist_name(url),
+          {:ok, p_songs} <- playlist_songs_ids(url)
+    do
+      file_contents = p_songs
+      |> Enum.map(
+        fn id ->
+          Path.join(Ytautodownloader.Constants.downloads_path, "#{id}.mp3")
+        end
+      )
+      |> Enum.join("\n")
+
+      case File.write(Path.join(playlists_directory, "#{p_name}.m3u"), file_contents, [:write]) do
+        {:error, _} -> 
+          IO.puts("PLAYLIST WRITE ERROR")
+          :error
+        :ok -> :ok
+      end
+    else
+      _ -> :error
+    end
+  end
+
+  @spec download_playlist(String.t()) :: :ok | :error
   def download_playlist(url) do
-    System.cmd("yt-dlp", [
+    case System.cmd("yt-dlp", [
       "--cookies-from-browser", "firefox",
       "--embed-metadata",
       "--embed-thumbnail",
@@ -101,10 +144,16 @@ defmodule Ytautodownloader.Ytdlp do
       "--audio-format", "mp3",
       "-f", "ba",
       "--windows-filenames",
-      "--download-archive", Path.join(Ytautodownloader.Constants.yt_autodownload_path, "__ARCHIVE__.txt"),
-      "-o", Path.join(Ytautodownloader.Constants.yt_autodownload_path, "%(id)s.%(ext)s"),
+      "--download-archive", Path.join(Ytautodownloader.Constants.downloads_path(), "__ARCHIVE__.txt"),
+      "-o", Path.join(Ytautodownloader.Constants.downloads_path(), "%(id)s.%(ext)s"),
       url,
-    ])
+    ],
+    [
+      into: IO.stream(:stdio, :line)
+    ]) do
+      {_, 1} -> :error
+      {_, 0} -> :ok
+    end
   end
 end
 
