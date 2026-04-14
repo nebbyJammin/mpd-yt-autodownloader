@@ -6,7 +6,11 @@ A simple script written in elixir that downloads your youtube playlists using yt
 
 ## Description
 
-An in-depth paragraph about your project and overview of use.
+Currently I primarily use [MPD](https://www.github.com/musicplayerdaemon/mpd) alongside [RMPC](https://www.github.com/niemrek/rmpc) to play music. This requires that I have all my music downloaded locally. The problem being, I use Youtube to manage my playlists.
+
+This script downloads files locally, caches them, and automatically generates playlist metadata (.m3u) files, which can be interpretted by MPD and alongside other MPD clients.
+
+> While RMPC and maybe other MPD clients can play youtube videos directly, it requires redownloading the video each time.
 
 ## Getting Started
 
