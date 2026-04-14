@@ -1,26 +1,32 @@
 Mix.install([
-  {:exqlite, "~> 0.13"}
+  {:jason, "~> 1.4"}
 ])
 
 defmodule Ytautodownloader.Constants do
   @yt_autodownload_dir Path.join(__DIR__, "yt-autodownload")
   @downloads_dir Path.join(@yt_autodownload_dir, "downloads")
+  @config_path Path.join(__DIR__, "config.json")
 
   def yt_autodownload_path, do: @yt_autodownload_dir
   def downloads_path, do: @downloads_dir
+  def config_path, do: @config_path
 end
 
 defmodule Ytautodownloader do
 
   def main(_args \\ []) do
     init()
-
-    Ytautodownloader.Ytdlp.update_playlist("https://youtube.com/playlist?list=PLKLMsHwPzDZG4pXDwB2M7LwZYq6Rvx1dh")
-    # Ytautodownloader.Ytdlp.update_playlist("https://www.youtube.com/playlist?list=PLKLMsHwPzDZF7-woh99h2AUeUn40k0ny6")
-
+    config = Ytautodownloader.Config.load_config!()
+    
+    config.playlists
+    |> Enum.each(
+      fn url ->
+        Ytautodownloader.Ytdlp.update_playlist(url, config)
+      end
+    )
   end
 
-  defp init() do
+  defp init do
     # Ensure directories exist
     case File.mkdir_p(Ytautodownloader.Constants.downloads_path) do
       :ok -> :ok
@@ -39,19 +45,30 @@ defmodule Ytautodownloader.Config do
 
   @type t() :: %__MODULE__{
     cookies_from_browser: String.t(),
+    playlists_directory: String.t(),
     playlists: [String.t()],
   }
 
-  @spec load_config() :: {:ok, t()} | {:error, atom()}
-  def load_config() do
-    config_path = Path.join(__DIR__, "config.json")
+  @spec load_config!() :: Ytautodownloader.Config.t()
+  def load_config! do
+    with {:ok, body} <- File.read(Ytautodownloader.Constants.config_path()),
+          {:ok, data} <- Jason.decode(body, keys: :atoms) do
+      data |> IO.inspect()
+      struct!(Ytautodownloader.Config, data)
+    else
+      {:error, %Jason.DecodeError{} = error} -> 
+        throw("Invalid JSON in configuration file at byte #{error.position} in: #{error.data}")
+      {:error, reason} ->
+        throw("Could not read configuration file: #{reason}")
+    end
+  end
 
-    case File.open(config_path) do
-      {:ok, config_file} ->
-        config_file |> IO.inspect()
-      {:error, _reason} ->
-        # File is missing, so create config
-        _config_file = File.open(config_path, [:write])
+  @spec get_absolute_playlists_path(String.t()) :: String.t()
+  def get_absolute_playlists_path(config_path) do
+    # TODO: Probably should do more checking on the input
+    case Path.type(config_path) do
+      :relative -> Path.join(__DIR__, config_path)
+      _ -> config_path
     end
   end
 
@@ -61,10 +78,10 @@ defmodule Ytautodownloader.Ytdlp do
   @doc """
   Updates a playlist fully. Can partially fail, if for example the downloading succeeds, but the metadata cannot be fetched.
   """
-  @spec update_playlist(String.t()) :: :ok | :error
-  def update_playlist(url) do
-    with  :ok <- download_playlist(url),
-          :ok <- make_playlist_manifest(url)
+  @spec update_playlist(String.t(), Ytautodownloader.Config.t()) :: :ok | :error
+  def update_playlist(url, config) do
+    with  :ok <- download_playlist(url, config),
+          :ok <- make_playlist_manifest(url, config)
     do
       :ok
     else
@@ -72,10 +89,10 @@ defmodule Ytautodownloader.Ytdlp do
     end
   end
 
-  @spec playlist_name(String.t()) :: {:ok, String.t()} | :error
-  def playlist_name(url) do
+  @spec playlist_name(String.t(), Ytautodownloader.Config.t()) :: {:ok, String.t()} | :error
+  def playlist_name(url, %Ytautodownloader.Config{cookies_from_browser: cookies_method}) do
     case System.cmd("yt-dlp", [
-      "--cookies-from-browser", "firefox", # TODO: Accept options
+      "--cookies-from-browser", cookies_method, # TODO: Accept options
       "--skip-download",
       "--flat-playlist",
       "--print", "%(playlist_title)s",
@@ -87,10 +104,10 @@ defmodule Ytautodownloader.Ytdlp do
     end
   end
 
-  @spec playlist_songs_ids(String.t()) :: {:ok, [String.t()]} | :error
-  def playlist_songs_ids(url) do
+  @spec playlist_songs_ids(String.t(), Ytautodownloader.Config.t()) :: {:ok, [String.t()]} | :error
+  def playlist_songs_ids(url, %Ytautodownloader.Config{cookies_from_browser: cookies_method}) do
     case System.cmd("yt-dlp", [
-      "--cookies-from-browser", "firefox",
+      "--cookies-from-browser", cookies_method,
       "--flat-playlist",
       "--print", "id",
       url,
@@ -106,15 +123,12 @@ defmodule Ytautodownloader.Ytdlp do
     end
   end
 
-  @spec make_playlist_manifest(String.t()) :: :ok | :error
-  def make_playlist_manifest(url) do
+  @spec make_playlist_manifest(String.t(), Ytautodownloader.Config.t()) :: :ok | :error
+  def make_playlist_manifest(url, %Ytautodownloader.Config{playlists_directory: playlists_directory} = config) do
     IO.puts("Making playlist manifest (.m3u) file for #{url}")
 
-    # TODO: Make this configurable
-    playlists_directory = Path.join(__DIR__, "Playlists")
-
-    with  {:ok, p_name} <- playlist_name(url),
-          {:ok, p_songs} <- playlist_songs_ids(url)
+    with  {:ok, p_name} <- playlist_name(url, config),
+          {:ok, p_songs} <- playlist_songs_ids(url, config)
     do
       file_contents = p_songs
       |> Enum.map(
@@ -136,10 +150,10 @@ defmodule Ytautodownloader.Ytdlp do
   end
 
   # TODO: This function returns an error when a video is unavailable... Should we silently fail on unavailable videos
-  @spec download_playlist(String.t()) :: :ok | :error
-  def download_playlist(url) do
+  @spec download_playlist(String.t(), Ytautodownloader.Config.t()) :: :ok | :error
+  def download_playlist(url, %Ytautodownloader.Config{cookies_from_browser: cookies_method}) do
     case System.cmd("yt-dlp", [
-      "--cookies-from-browser", "firefox",
+      "--cookies-from-browser", cookies_method,
       "--embed-metadata",
       "--embed-thumbnail",
       "--convert-thumbnails", "jpg",
