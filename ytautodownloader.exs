@@ -108,6 +108,8 @@ defmodule Ytautodownloader.Ytdlp do
 
   @spec make_playlist_manifest(String.t()) :: :ok | :error
   def make_playlist_manifest(url) do
+    IO.puts("Making playlist manifest (.m3u) file for #{url}")
+
     # TODO: Make this configurable
     playlists_directory = Path.join(__DIR__, "Playlists")
 
