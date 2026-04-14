@@ -2,6 +2,7 @@
   "cookies_from_browser": "firefox",
   "playlists_directory": "./Playlists/",
   "playlists": [
-    "some_url"
+    "https://www.youtube.com/playlist?list=<INSERT_YOUR_PLAYLIST_HERE>",
+    "https://www.youtube.com/playlist?list=<INSERT_YOUR_PLAYLIST_HERE>"
   ]
 }
